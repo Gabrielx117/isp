@@ -13,28 +13,30 @@ from email.mime.text import MIMEText
 from email.utils import parseaddr, formataddr
 
 
-def get(isp):
+def get(url):
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
-    with urllib.request.urlopen(isp['url'], context=ctx) as i:
+    with urllib.request.urlopen(url, context=ctx) as i:
         ip = i.readlines()
+    return ip
 
-    new = set(ip)
+def diff(now,history):
+    new = set(now)
 
     try:
-        with open(isp['file'], 'rb') as i:
+        with open(history, 'rb') as i:
             old = set(pickle.load(i))
     except:
         IndexError
         old = set()
 
-    with open(isp['file'], 'wb') as i:
-        pickle.dump(ip, i)
+    with open(history, 'wb') as i:
+        pickle.dump(new, i)
 
     add = new - old or None  # 新增差量
     remove = old - new or None
-    return format(isp['cname'], add, remove)
+    return (add, remove)
 
 
 def to_str(args):
@@ -63,7 +65,6 @@ def _format_addr(s):
 
 
 def let_them_know(context):
-    print(context)
     email = '%s/email.json' % sys.path[0]
     with open(email, 'r', encoding='utf-8') as f:
         email_info = json.load(f)
@@ -83,6 +84,15 @@ def let_them_know(context):
     server.quit()
 
 
+def op(**kwargs):
+    url=kwargs['url']
+    cname=kwargs['cname']
+    file=kwargs['file']
+    ip=get(url)
+    add,remove=diff(ip,file)
+    result=format(cname,add,remove)
+    return result
+
 if __name__ == '__main__':
 
     unicom = {'cname': '中国联通', 'url': 'http://ispip.clang.cn/unicom_cnc_cidr.txt',
@@ -92,9 +102,9 @@ if __name__ == '__main__':
     cmcc = {'cname': '中国移动', 'url': 'https://ispip.clang.cn/cmcc_cidr.txt',
             'file': '%s/cmcc.txt' % sys.path[0]}
 
-    result_unicom = get(unicom)
-    result_telecom = get(telecom)
-    result_cmcc = get(cmcc)
+    result_unicom = op(**unicom)
+    result_telecom = op(**telecom)
+    result_cmcc = op(**cmcc)
 
     if result_cmcc or result_unicom or result_telecom:
         result = '\n'.join(
